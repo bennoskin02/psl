@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PSL Tracker – Gesichtsanalyse</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0b0d12;--panel:#12151d;--panel2:#181c26;--line:#262b38;--text:#e8ebf2;--muted:#8a91a3;
+  --acc:#7c9cff;--acc2:#a78bfa;--good:#34d399;--mid:#fbbf24;--bad:#f87171;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif;font-size:15px;line-height:1.5}
+.wrap{max-width:1180px;margin:0 auto;padding:24px 18px 60px}
+header{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:22px}
+.logo{display:flex;align-items:center;gap:12px}
+.logo .mark{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,var(--acc),var(--acc2));display:grid;place-items:center;font-weight:800;color:#0b0d12}
+.logo h1{font-size:20px;margin:0;letter-spacing:-.02em}
+.logo p{margin:0;color:var(--muted);font-size:13px}
+.tabs{display:flex;gap:6px;background:var(--panel);padding:4px;border-radius:12px;border:1px solid var(--line)}
+.tabs button{background:none;border:0;color:var(--muted);padding:8px 14px;border-radius:9px;font:inherit;font-weight:600;cursor:pointer}
+.tabs button.on{background:var(--panel2);color:var(--text)}
+.grid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:18px}
+@media(max-width:900px){.grid{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px}
+.card h2{font-size:15px;margin:0 0 12px;letter-spacing:-.01em}
+.btn{background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:9px 14px;border-radius:10px;font:inherit;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:8px}
+.btn:hover{border-color:#3a4152}
+.btn.pri{background:linear-gradient(135deg,var(--acc),var(--acc2));color:#0b0d12;border:0}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.drop{border:2px dashed var(--line);border-radius:14px;padding:34px 16px;text-align:center;color:var(--muted);cursor:pointer;transition:.15s}
+.drop:hover,.drop.over{border-color:var(--acc);color:var(--text)}
+.drop strong{display:block;color:var(--text);font-size:16px;margin-bottom:4px}
+#stageWrap{position:relative;display:none;margin-top:12px}
+#stage{width:100%;border-radius:12px;display:block;touch-action:none;cursor:crosshair;background:#000}
+#loupe{position:absolute;width:150px;height:150px;border-radius:50%;border:2px solid var(--acc);pointer-events:none;display:none;box-shadow:0 8px 30px #0008;background:#000}
+.status{font-size:13px;color:var(--muted);margin-top:10px;min-height:20px}
+.status.warn{color:var(--mid)}
+.status.err{color:var(--bad)}
+.plist{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:5px;margin-top:12px;max-height:230px;overflow:auto}
+.pi{font-size:12px;padding:5px 8px;border-radius:7px;background:var(--panel2);border:1px solid transparent;cursor:pointer;color:var(--muted);display:flex;gap:6px;align-items:center}
+.pi.set{color:var(--text)}
+.pi.cur{border-color:var(--acc);color:var(--text)}
+.pi .d{width:8px;height:8px;border-radius:50%;background:#3a4152;flex:none}
+.pi.set .d{background:var(--good)}
+.hint{background:var(--panel2);border-radius:10px;padding:10px 12px;font-size:13px;margin-top:10px}
+.hint b{color:var(--acc)}
+.seg{display:inline-flex;background:var(--panel2);border-radius:10px;padding:3px;border:1px solid var(--line)}
+.seg button{background:none;border:0;color:var(--muted);padding:6px 12px;border-radius:8px;font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+.seg button.on{background:var(--panel);color:var(--text)}
+.score{display:flex;gap:18px;align-items:center}
+.ring{position:relative;width:140px;height:140px;flex:none}
+.ring svg{transform:rotate(-90deg)}
+.ring .v{position:absolute;inset:0;display:grid;place-items:center;text-align:center}
+.ring .v b{font-size:38px;font-weight:800;letter-spacing:-.03em;display:block;line-height:1}
+.ring .v span{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.tier{font-size:20px;font-weight:700;margin:0}
+.sub{color:var(--muted);font-size:13px}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}
+.kpi{background:var(--panel2);border-radius:10px;padding:9px 10px}
+.kpi small{color:var(--muted);font-size:11px;display:block}
+.kpi b{font-size:17px}
+.m{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:10px 0;border-bottom:1px solid var(--line)}
+.m:last-child{border-bottom:0}
+.m .n{font-weight:600;font-size:14px}
+.m .val{font-family:'JetBrains Mono',monospace;font-size:13px;text-align:right}
+.m .ideal{color:var(--muted);font-size:12px}
+.m .sc{font-size:12px;text-align:right;font-weight:700}
+.bar{grid-column:1/-1;height:5px;background:var(--panel2);border-radius:3px;overflow:hidden;margin-top:4px}
+.bar i{display:block;height:100%;border-radius:3px}
+.m .ex{grid-column:1/-1;color:var(--muted);font-size:12px;margin-top:4px;display:none}
+.m.open .ex{display:block}
+.m{cursor:pointer}
+.tip{padding:12px;border-radius:12px;background:var(--panel2);margin-bottom:8px}
+.tip h4{margin:0 0 4px;font-size:14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.tip p{margin:0;font-size:13px;color:#c5cad6}
+.tag{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;padding:2px 7px;border-radius:20px}
+.tag.y{background:#34d39922;color:var(--good)}
+.tag.p{background:#fbbf2422;color:var(--mid)}
+.tag.n{background:#8a91a322;color:var(--muted)}
+.soft{display:grid;gap:10px}
+.soft label{display:grid;grid-template-columns:120px 1fr 34px;gap:10px;align-items:center;font-size:13px}
+.soft input[type=range]{accent-color:var(--acc)}
+.warns{margin-top:12px}
+.warns div{font-size:12.5px;color:var(--mid);padding:6px 10px;background:#fbbf2412;border-radius:8px;margin-bottom:5px}
+.note{font-size:12px;color:var(--muted);margin-top:14px;line-height:1.55}
+.hist table{width:100%;border-collapse:collapse;font-size:13px}
+.hist td,.hist th{padding:8px 6px;border-bottom:1px solid var(--line);text-align:left}
+.hist th{color:var(--muted);font-weight:600;font-size:12px}
+.empty{color:var(--muted);text-align:center;padding:30px 10px}
+#resultsCard{display:none}
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo"><div class="mark">Ψ</div><div><h1>PSL Tracker</h1><p>Gesichtsproportionen messen, bewerten, verbessern</p></div></div>
+    <div class="tabs"><button class="on" data-tab="analyse">Analyse</button><button data-tab="verlauf">Verlauf</button><button data-tab="methode">Methode</button></div>
+  </header>
+
+  <!-- ANALYSE -->
+  <section id="tab-analyse">
+    <div class="grid">
+      <div>
+        <div class="card">
+          <div class="row" style="justify-content:space-between;margin-bottom:12px">
+            <h2 style="margin:0">1 · Foto</h2>
+            <div class="seg" id="sexSeg"><button class="on" data-v="m">Männlich</button><button data-v="f">Weiblich</button></div>
+          </div>
+          <div class="drop" id="drop"><strong>Frontalfoto hochladen</strong>Klicken oder hierher ziehen · gerade in die Kamera, neutraler Blick, Haare aus der Stirn, ≥ 1 m Abstand</div>
+          <input type="file" id="file" accept="image/*" hidden>
+          <div class="row" style="margin-top:10px">
+            <button class="btn" id="camBtn">📷 Kamera</button>
+            <button class="btn" id="autoBtn" disabled>✨ Automatisch erkennen</button>
+            <button class="btn" id="manBtn" disabled>✍️ Punkte manuell setzen</button>
+            <button class="btn" id="undoBtn" disabled>↶</button>
+          </div>
+          <video id="cam" playsinline class="hidden" style="width:100%;border-radius:12px;margin-top:10px;transform:scaleX(-1)"></video>
+          <div class="row hidden" id="camRow" style="margin-top:8px"><button class="btn pri" id="snapBtn">Foto aufnehmen</button><button class="btn" id="camStop">Abbrechen</button></div>
+          <div id="stageWrap"><canvas id="stage"></canvas><canvas id="loupe" width="150" height="150"></canvas></div>
+          <div class="status" id="status"></div>
+          <div id="pointUI" class="hidden">
+            <div class="hint" id="hint"></div>
+            <div class="plist" id="plist"></div>
+            <div class="row" style="margin-top:12px"><button class="btn pri" id="calcBtn" disabled>Bewerten →</button><span class="sub" id="pcount"></span></div>
+          </div>
+        </div>
+        <div class="card" style="margin-top:18px">
+          <h2>2 · Soft-Faktoren <span class="sub" style="font-weight:400">(optional, ehrlich selbst einschätzen)</span></h2>
+          <div class="soft" id="soft"></div>
+          <label class="row sub" style="margin-top:10px"><input type="checkbox" id="softOn"> in den Hauptwert einrechnen (25 %)</label>
+        </div>
+      </div>
+
+      <div>
+        <div class="card" id="placeholder"><div class="empty">Lade ein Foto hoch und lass die Punkte erkennen oder setze sie selbst.<br>Danach bekommst du jede Kennzahl einzeln bewertet, einen Hauptwert und Tipps.</div></div>
+        <div id="resultsCard">
+          <div class="card">
+            <div class="score">
+              <div class="ring"><svg width="140" height="140"><circle cx="70" cy="70" r="60" stroke="#181c26" stroke-width="12" fill="none"/><circle id="ringArc" cx="70" cy="70" r="60" stroke="url(#g)" stroke-width="12" fill="none" stroke-linecap="round" stroke-dasharray="377" stroke-dashoffset="377"/><defs><linearGradient id="g"><stop offset="0" stop-color="#7c9cff"/><stop offset="1" stop-color="#a78bfa"/></linearGradient></defs></svg>
+                <div class="v"><div><b id="pslVal">–</b><span>PSL</span></div></div></div>
+              <div><p class="tier" id="tier">–</p><div class="sub" id="tierSub"></div>
+                <button class="btn" id="saveBtn" style="margin-top:10px">💾 Im Verlauf speichern</button></div>
+            </div>
+            <div class="kpis">
+              <div class="kpi"><small>Harmonie (Geometrie)</small><b id="kHarm">–</b></div>
+              <div class="kpi"><small>Symmetrie</small><b id="kSym">–</b></div>
+              <div class="kpi"><small>Messqualität</small><b id="kQual">–</b></div>
+            </div>
+            <div class="warns" id="warns"></div>
+          </div>
+          <div class="card" style="margin-top:18px"><h2>Alle Kennzahlen <span class="sub" style="font-weight:400">· antippen für Erklärung</span></h2><div id="metrics"></div></div>
+          <div class="card" style="margin-top:18px"><h2>Tipps – sortiert nach Wirkung</h2><div id="tips"></div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- VERLAUF -->
+  <section id="tab-verlauf" class="hidden">
+    <div class="card hist"><h2>Dein Verlauf</h2><div id="chart"></div><div id="histTable"></div>
+      <p class="note">Gespeichert wird nur in diesem Browser. Vergleiche nur Fotos mit gleichem Abstand, Licht und Winkel – sonst misst du die Kamera, nicht dein Gesicht.</p></div>
+  </section>
+
+  <!-- METHODE -->
+  <section id="tab-methode" class="hidden">
+    <div class="card">
+      <h2>Wie der Wert entsteht – und was er nicht kann</h2>
+      <p>Der Tracker misst <b>14 Proportionen</b> aus 27 Gesichtspunkten (u. a. FWHR, Canthal Tilt, Midface-Ratio, Gesichtsdrittel, Kiefer-/Wangenbreite, Augenabstand, Symmetrie). Jede Kennzahl wird mit einem Idealbereich verglichen, der in der Ästhetik-Forschung und in Looksmax-Communities üblich ist: im Bereich = 10/10, außerhalb fällt der Wert weich ab. Die gewichteten Teilwerte ergeben den <b>Harmonie-Score (0–10)</b>, der auf die <b>PSL-Skala (1–8)</b> umgerechnet wird; 4 entspricht dem Durchschnitt.</p>
+      <p><b>Ehrlich gesagt:</b> Echte PSL-Werte entstehen durch viele menschliche Bewertungen, nicht durch Lineale. Proportionen erklären nur einen Teil von Attraktivität. Haut, Haare, Augenfarbe, Körperfett, Ausdruck, Ausstrahlung und Stil zählen mindestens genauso viel. Auch FaceKit und ähnliche Apps messen nur Geometrie und rechnen sie in einen Wert um; keine App kann „wahre" Attraktivität messen. Ehrlich ist hier: Jede Kennzahl ist echt gemessen, nachvollziehbar und wird angezeigt.</p>
+      <p><b>Fehlerquellen:</b> Weitwinkel-Handykamera aus der Nähe (macht Nase größer und Gesicht schmaler), gekippter oder gedrehter Kopf, Lächeln, Haare über Stirn oder Kiefer, ungenau gesetzte Punkte. Die Messqualität im Ergebnis warnt dich davor.</p>
+      <p><b>Automatik:</b> nutzt Googles MediaPipe Face Landmarker (478 Punkte) direkt im Browser. Dein Foto verlässt nie dein Gerät. Falls die Automatik in deiner Ansicht blockiert ist, setz die Punkte manuell oder öffne die HTML-Datei lokal im Browser (dort funktioniert auch die Kamera).</p>
+    </div>
+  </section>
+</div>
+
+<script>
+// ---------- Punkte-Definition ----------
+const POINTS = [
+ ['hairline','Haaransatz','Mitte des Haaransatzes (oben auf der Stirn).'],
+ ['browL','Braue links (Bild)','Höchster Punkt / Mitte der Augenbraue.'],
+ ['browR','Braue rechts (Bild)','Höchster Punkt / Mitte der Augenbraue.'],
+ ['nasion','Nasenwurzel','Tiefster Punkt zwischen den Augen, Nasenansatz.'],
+ ['pupilL','Pupille links','Mitte der Pupille.'],
+ ['pupilR','Pupille rechts','Mitte der Pupille.'],
+ ['eyeOutL','Äußerer Augenwinkel L','Wo Ober- und Unterlid außen zusammentreffen.'],
+ ['eyeInL','Innerer Augenwinkel L','Innerer Lidwinkel (Tränenpunkt-Seite).'],
+ ['eyeInR','Innerer Augenwinkel R','Innerer Lidwinkel.'],
+ ['eyeOutR','Äußerer Augenwinkel R','Wo die Lider außen zusammentreffen.'],
+ ['eyeTopL','Oberlid L','Höchster Punkt der Lidkante über der Pupille.'],
+ ['eyeBotL','Unterlid L','Tiefster Punkt der Unterlidkante.'],
+ ['eyeTopR','Oberlid R','Höchster Punkt der Lidkante.'],
+ ['eyeBotR','Unterlid R','Tiefster Punkt der Unterlidkante.'],
+ ['zygL','Wangenknochen L','Breiteste Stelle des Gesichts auf Wangenknochenhöhe (Außenkontur).'],
+ ['zygR','Wangenknochen R','Breiteste Stelle auf Wangenknochenhöhe.'],
+ ['alarL','Nasenflügel L','Äußerster Punkt des Nasenflügels.'],
+ ['alarR','Nasenflügel R','Äußerster Punkt des Nasenflügels.'],
+ ['subnasale','Subnasale','Wo die Nasenunterseite in die Oberlippe übergeht.'],
+ ['lipTop','Oberlippe oben','Oberkante der Oberlippe (Amorbogen-Mitte).'],
+ ['stomion','Mundspalte','Mitte zwischen den Lippen.'],
+ ['lipBot','Unterlippe unten','Unterkante der Unterlippe.'],
+ ['mouthL','Mundwinkel L','Äußerer Mundwinkel.'],
+ ['mouthR','Mundwinkel R','Äußerer Mundwinkel.'],
+ ['gonL','Kieferwinkel L','Kieferecke an der Außenkontur (Gonion).'],
+ ['gonR','Kieferwinkel R','Kieferecke an der Außenkontur.'],
+ ['menton','Kinnspitze','Tiefster Punkt des Kinns.'],
+];
+const MESH = {hairline:10,browL:105,browR:334,nasion:168,pupilL:468,pupilR:473,eyeOutL:33,eyeInL:133,eyeInR:362,eyeOutR:263,
+ eyeTopL:159,eyeBotL:145,eyeTopR:386,eyeBotR:374,zygL:234,zygR:454,alarL:129,alarR:358,subnasale:2,lipTop:0,stomion:13,lipBot:17,
+ mouthL:61,mouthR:291,gonL:172,gonR:397,menton:152};
+const PAIRS = [['browL','browR'],['pupilL','pupilR'],['eyeOutL','eyeOutR'],['eyeInL','eyeInR'],['eyeTopL','eyeTopR'],['eyeBotL','eyeBotR'],
+ ['zygL','zygR'],['alarL','alarR'],['mouthL','mouthR'],['gonL','gonR']];
+
+const SOFT = [
+ ['skin','Haut','Reinheit, Ebenmäßigkeit, keine Augenringe'],
+ ['hair','Haare','Dichte, Haarlinie, passender Schnitt'],
+ ['leanness','Gesichtsfett','5 = sehr definiert, 1 = viel Fett im Gesicht'],
+ ['teeth','Zähne/Lächeln','Gerade, hell, gepflegt'],
+ ['brows','Augenbrauen','Dichte und Form'],
+];
+
+// ---------- State ----------
+let img=null, pts={}, autoHair=false, mode=null, cur=0, sex='m', history=[], lastResult=null;
+const stage=document.getElementById('stage'), ctx=stage.getContext('2d');
+const loupe=document.getElementById('loupe'), lctx=loupe.getContext('2d');
+const $=id=>document.getElementById(id);
+try{history=JSON.parse(localStorage.getItem('psl_hist')||'[]')}catch(e){history=[]}
+
+// Tabs
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('on',x===b));
+  ['analyse','verlauf','methode'].forEach(t=>$('tab-'+t).classList.toggle('hidden',t!==b.dataset.tab));
+  if(b.dataset.tab==='verlauf')renderHistory();
+});
+$('sexSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{
+  sex=b.dataset.v;$('sexSeg').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));
+  if(lastResult)evaluate();
+});
+
+// Soft-Faktoren
+$('soft').innerHTML=SOFT.map(([k,n,d])=>`<label title="${d}"><span>${n}<br><span class="sub" style="font-size:11px">${d}</span></span><input type="range" min="1" max="5" step="1" value="3" id="s_${k}"><b id="sv_${k}">3</b></label>`).join('');
+SOFT.forEach(([k])=>$('s_'+k).oninput=e=>{$('sv_'+k).textContent=e.target.value;if(lastResult)evaluate()});
+$('softOn').onchange=()=>{if(lastResult)evaluate()};
+
+function status(t,cls=''){const s=$('status');s.textContent=t;s.className='status '+cls}
+
+// ---------- Bild laden ----------
+const drop=$('drop'),file=$('file');
+drop.onclick=()=>file.click();
+drop.ondragover=e=>{e.preventDefault();drop.classList.add('over')};
+drop.ondragleave=()=>drop.classList.remove('over');
+drop.ondrop=e=>{e.preventDefault();drop.classList.remove('over');if(e.dataTransfer.files[0])loadFile(e.dataTransfer.files[0])};
+file.onchange=()=>{if(file.files[0])loadFile(file.files[0])};
+function loadFile(f){const u=URL.createObjectURL(f);const im=new Image();im.onload=()=>setImage(im);im.onerror=()=>status('Bild konnte nicht geladen werden.','err');im.src=u}
+function setImage(im){
+  img=im;pts={};autoHair=false;mode=null;cur=0;lastResult=null;
+  const max=1400,sc=Math.min(1,max/Math.max(im.naturalWidth||im.width,im.naturalHeight||im.height));
+  stage.width=Math.round((im.naturalWidth||im.width)*sc);stage.height=Math.round((im.naturalHeight||im.height)*sc);
+  img._sc=sc;
+  $('stageWrap').style.display='block';drop.style.display='none';
+  $('autoBtn').disabled=false;$('manBtn').disabled=false;
+  $('pointUI').classList.add('hidden');$('resultsCard').style.display='none';$('placeholder').style.display='block';
+  draw();status('Foto geladen. Wähle „Automatisch erkennen" oder setze die Punkte manuell.');
+  drop.insertAdjacentHTML('afterend','');
+  if(!$('newPhoto')){const b=document.createElement('button');b.className='btn';b.id='newPhoto';b.textContent='🖼️ Anderes Foto';b.onclick=()=>file.click();$('undoBtn').after(b)}
+}
+
+// Kamera (funktioniert nur, wenn die Seite lokal / ohne Sandbox geöffnet ist)
+let stream=null;
+$('camBtn').onclick=async()=>{
+  try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:1280,height:960}});
+    const v=$('cam');v.srcObject=stream;await v.play();v.classList.remove('hidden');$('camRow').classList.remove('hidden');status('Gerade in die Kamera schauen, Kopf nicht neigen.')}
+  catch(e){status('Kamera ist in dieser Ansicht blockiert. Lade ein Foto hoch oder öffne die HTML-Datei lokal im Browser.','warn')}
+};
+function stopCam(){if(stream)stream.getTracks().forEach(t=>t.stop());stream=null;$('cam').classList.add('hidden');$('camRow').classList.add('hidden')}
+$('camStop').onclick=stopCam;
+$('snapBtn').onclick=()=>{const v=$('cam'),c=document.createElement('canvas');c.width=v.videoWidth;c.height=v.videoHeight;const x=c.getContext('2d');x.translate(c.width,0);x.scale(-1,1);x.drawImage(v,0,0);stopCam();const im=new Image();im.onload=()=>setImage(im);im.src=c.toDataURL('image/jpeg',.95)};
+
+// ---------- Automatik (MediaPipe) ----------
+let landmarker=null;
+$('autoBtn').onclick=async()=>{
+  status('Lade Gesichtserkennung … (einmalig ~5 MB)');$('autoBtn').disabled=true;
+  try{
+    if(!landmarker){
+      const V='https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14';
+      const vision=await withTimeout(import(V+'/vision_bundle.mjs'),20000);
+      const fs=await withTimeout(vision.FilesetResolver.forVisionTasks(V+'/wasm'),20000);
+      landmarker=await withTimeout(vision.FaceLandmarker.createFromOptions(fs,{baseOptions:{modelAssetPath:'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',delegate:'CPU'},runningMode:'IMAGE',numFaces:1}),30000);
+    }
+    const c=document.createElement('canvas');c.width=stage.width;c.height=stage.height;c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+    const r=landmarker.detect(c);
+    if(!r.faceLandmarks||!r.faceLandmarks.length){status('Kein Gesicht gefunden. Besseres Licht / frontaleres Foto probieren oder manuell setzen.','err');$('autoBtn').disabled=false;return}
+    const L=r.faceLandmarks[0];pts={};
+    for(const k in MESH){const p=L[MESH[k]];if(p)pts[k]={x:p.x*c.width,y:p.y*c.height}}
+    fixSides();autoHair=true;mode='auto';
+    showPointUI();
+    status('27 Punkte erkannt. Prüfe sie kurz (ziehen zum Korrigieren). Wichtig: Haaransatz ist nur geschätzt. Zieh ihn auf deinen echten Haaransatz, sonst wird das obere Drittel nicht gewertet.','warn');
+    evaluate();
+  }catch(e){
+    console.log(e);
+    status('Automatik ist in dieser Ansicht blockiert (Sicherheitsrichtlinie). Setz die Punkte manuell – dauert ~2 Minuten – oder öffne die HTML-Datei lokal.','warn');
+    startManual();
+  }
+  $('autoBtn').disabled=false;
+};
+function withTimeout(p,ms){return Promise.race([p,new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),ms))])}
+function fixSides(){PAIRS.forEach(([a,b])=>{if(pts[a]&&pts[b]&&pts[a].x>pts[b].x){const t=pts[a];pts[a]=pts[b];pts[b]=t}})}
+
+// ---------- Manuell ----------
+$('manBtn').onclick=()=>startManual();
+function startManual(){mode='manual';cur=POINTS.findIndex(p=>!pts[p[0]]);if(cur<0)cur=0;showPointUI();status('Klicke auf den markierten Punkt. Gesetzte Punkte kannst du ziehen. Die Lupe hilft beim genauen Setzen.')}
+function showPointUI(){$('pointUI').classList.remove('hidden');$('undoBtn').disabled=false;renderList();draw()}
+function renderList(){
+  $('plist').innerHTML=POINTS.map(([k,n],i)=>`<div class="pi ${pts[k]?'set':''} ${i===cur&&mode==='manual'?'cur':''}" data-i="${i}"><span class="d"></span>${n}</div>`).join('');
+  $('plist').querySelectorAll('.pi').forEach(el=>el.onclick=()=>{cur=+el.dataset.i;mode=mode||'manual';if(mode==='auto')mode='manual';renderList();draw()});
+  const p=POINTS[cur];$('hint').innerHTML=mode==='manual'&&p?`<b>${cur+1}/${POINTS.length} · ${p[1]}</b> – ${p[2]}${pts[p[0]]?' <span class="sub">(gesetzt – klick zum Versetzen)</span>':''}`:'Ziehe Punkte, um sie zu korrigieren. Antippen eines Eintrags setzt ihn neu.';
+  const n=POINTS.filter(p=>pts[p[0]]).length;$('pcount').textContent=`${n}/${POINTS.length} Punkte`;
+  $('calcBtn').disabled=n<POINTS.length-1||POINTS.some(p=>p[0]!=='hairline'&&!pts[p[0]]);
+}
+$('undoBtn').onclick=()=>{if(mode!=='manual')return;const lastSet=[...POINTS].reverse().find(p=>pts[p[0]]);if(lastSet){delete pts[lastSet[0]];cur=POINTS.indexOf(lastSet);renderList();draw()}};
+$('calcBtn').onclick=()=>evaluate(true);
+
+// ---------- Zeichnen & Interaktion ----------
+function draw(){
+  if(!img)return;ctx.drawImage(img,0,0,stage.width,stage.height);
+  const s=stage.width/stage.getBoundingClientRect().width||1, r=Math.max(3,4*s);
+  // Hilfslinien
+  if(pts.pupilL&&pts.pupilR){ctx.strokeStyle='#7c9cff88';ctx.lineWidth=1.5*s;ctx.beginPath();ctx.moveTo(pts.pupilL.x,pts.pupilL.y);ctx.lineTo(pts.pupilR.x,pts.pupilR.y);ctx.stroke()}
+  if(pts.zygL&&pts.zygR){line(pts.zygL,pts.zygR,'#a78bfa88',s)}
+  if(pts.gonL&&pts.gonR){line(pts.gonL,pts.gonR,'#a78bfa88',s)}
+  if(pts.nasion&&pts.menton){line(pts.nasion,pts.menton,'#ffffff44',s)}
+  ['hairline','browL','subnasale','menton'].forEach(k=>{if(pts[k]){ctx.strokeStyle='#34d39955';ctx.setLineDash([6*s,6*s]);ctx.beginPath();ctx.moveTo(0,pts[k].y);ctx.lineTo(stage.width,pts[k].y);ctx.stroke();ctx.setLineDash([])}});
+  POINTS.forEach(([k],i)=>{const p=pts[k];if(!p)return;
+    ctx.beginPath();ctx.arc(p.x,p.y,r*(i===cur&&mode==='manual'?1.6:1),0,7);
+    ctx.fillStyle=k==='hairline'&&autoHair?'#fbbf24':(i===cur&&mode==='manual'?'#a78bfa':'#7c9cff');ctx.fill();ctx.lineWidth=1.5*s;ctx.strokeStyle='#0b0d12';ctx.stroke()});
+}
+function line(a,b,c,s){ctx.strokeStyle=c;ctx.lineWidth=1.5*s;ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke()}
+function evPos(e){const b=stage.getBoundingClientRect();return{x:(e.clientX-b.left)*stage.width/b.width,y:(e.clientY-b.top)*stage.height/b.height,cx:e.clientX-b.left,cy:e.clientY-b.top}}
+let drag=null;
+stage.addEventListener('pointerdown',e=>{
+  if(!img||!mode)return;const p=evPos(e);const s=stage.width/stage.getBoundingClientRect().width;
+  let best=null,bd=18*s;for(const k in pts){const d=Math.hypot(pts[k].x-p.x,pts[k].y-p.y);if(d<bd){bd=d;best=k}}
+  if(best&&!(mode==='manual'&&!pts[POINTS[cur][0]]&&bd>8*s)){drag=best;stage.setPointerCapture(e.pointerId)}
+  else if(mode==='manual'){const k=POINTS[cur][0];pts[k]={x:p.x,y:p.y};drag=k;stage.setPointerCapture(e.pointerId)}
+  showLoupe(p);draw();
+});
+stage.addEventListener('pointermove',e=>{const p=evPos(e);if(drag){pts[drag]={x:p.x,y:p.y};if(drag==='hairline')autoHair=false;draw()}if(drag||e.pointerType==='mouse')showLoupe(p)});
+stage.addEventListener('pointerup',()=>{
+  if(drag){fixSides();if(mode==='manual'&&drag===POINTS[cur][0]){const nx=POINTS.findIndex((q,i)=>!pts[q[0]]);if(nx>=0)cur=nx}
+    drag=null;renderList();draw();if(lastResult)evaluate()}
+  loupe.style.display='none'});
+stage.addEventListener('pointerleave',()=>{if(!drag)loupe.style.display='none'});
+function showLoupe(p){
+  if(!img)return;const z=4,w=150;loupe.style.display='block';
+  const b=stage.getBoundingClientRect();let lx=p.cx+20,ly=p.cy-w-20;if(lx+w>b.width)lx=p.cx-w-20;if(ly<0)ly=p.cy+20;
+  loupe.style.left=lx+'px';loupe.style.top=ly+'px';
+  const src=w/z*(stage.width/b.width);
+  lctx.fillStyle='#000';lctx.fillRect(0,0,w,w);
+  lctx.drawImage(stage,p.x-src/2,p.y-src/2,src,src,0,0,w,w);
+  lctx.strokeStyle='#fff';lctx.lineWidth=1;lctx.beginPath();lctx.moveTo(w/2,w/2-12);lctx.lineTo(w/2,w/2+12);lctx.moveTo(w/2-12,w/2);lctx.lineTo(w/2+12,w/2);lctx.stroke();
+}
+window.addEventListener('resize',draw);
+
+// ---------- Mathematik ----------
+const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+function normalize(P){ // Kopfneigung (Roll) korrigieren
+  const a=Math.atan2(P.pupilR.y-P.pupilL.y,P.pupilR.x-P.pupilL.x),c={x:(P.pupilL.x+P.pupilR.x)/2,y:(P.pupilL.y+P.pupilR.y)/2};
+  const cos=Math.cos(-a),sin=Math.sin(-a),Q={};
+  for(const k in P){const dx=P[k].x-c.x,dy=P[k].y-c.y;Q[k]={x:dx*cos-dy*sin,y:dx*sin+dy*cos}}
+  return{Q,roll:a*180/Math.PI};
+}
+// Score: im Idealbereich 10, außerhalb weicher Abfall (bei Abstand = tol → 5)
+function score(v,lo,hi,tol){const d=v<lo?lo-v:v>hi?v-hi:0;return 10*Math.pow(.5,(d/tol)**2)}
+
+function measure(P){
+  const {Q,roll}=normalize(P);
+  const W=Math.abs(Q.zygR.x-Q.zygL.x);
+  const browY=(Q.browL.y+Q.browR.y)/2, pupY=(Q.pupilL.y+Q.pupilR.y)/2;
+  const ipd=Math.abs(Q.pupilR.x-Q.pupilL.x);
+  const icd=Math.abs(Q.eyeInR.x-Q.eyeInL.x);
+  const eyeWL=dist(Q.eyeOutL,Q.eyeInL),eyeWR=dist(Q.eyeOutR,Q.eyeInR),eyeW=(eyeWL+eyeWR)/2;
+  const eyeHL=Q.eyeBotL.y-Q.eyeTopL.y,eyeHR=Q.eyeBotR.y-Q.eyeTopR.y;
+  const tilt=o=>{const i=o==='L'?Q.eyeInL:Q.eyeInR,out=o==='L'?Q.eyeOutL:Q.eyeOutR;return Math.atan2(i.y-out.y,Math.abs(out.x-i.x))*180/Math.PI};
+  const tL=tilt('L'),tR=tilt('R');
+  const midX=(Q.nasion.x+Q.subnasale.x+Q.stomion.x+Q.menton.x)/4;
+  // Symmetrie
+  let symSum=0,n=0;
+  PAIRS.forEach(([a,b])=>{const da=midX-Q[a].x,db=Q[b].x-midX;symSum+=Math.abs(da-db)+Math.abs(Q[a].y-Q[b].y);n++});
+  const asym=symSum/n/W*100;
+  const yaw=(midX-Q.zygL.x)/(Q.zygR.x-midX);
+  const mid=Q.subnasale.y-browY, low=Q.menton.y-Q.subnasale.y;
+  const up=P.hairline&&!autoHair?browY-Q.hairline.y:null;
+  return{roll,yaw,W,
+    fwhr:W/(Q.lipTop.y-browY),
+    tilt:(tL+tR)/2,tiltDiff:Math.abs(tL-tR),
+    esr:ipd/W,
+    midface:ipd/(Q.lipTop.y-pupY),
+    jaw:Math.abs(Q.gonR.x-Q.gonL.x)/W,
+    findex:(Q.menton.y-Q.nasion.y)/W,
+    lowMid:low/mid,
+    upMid:up?up/mid:null,
+    lower:(Q.menton.y-Q.stomion.y)/(Q.stomion.y-Q.subnasale.y),
+    chin:(Q.menton.y-Q.lipBot.y)/(Q.lipTop.y-Q.subnasale.y),
+    noseIcd:Math.abs(Q.alarR.x-Q.alarL.x)/icd,
+    mouthNose:Math.abs(Q.mouthR.x-Q.mouthL.x)/Math.abs(Q.alarR.x-Q.alarL.x),
+    lips:(Q.lipBot.y-Q.stomion.y)/(Q.stomion.y-Q.lipTop.y),
+    eyeAsp:((eyeHL+eyeHR)/2)/eyeW,
+    fifths:icd/eyeW,
+    asym};
+}
+
+// Definition aller Kennzahlen: [key, Name, Gewicht, {m:[lo,hi,tol], f:[...]}, Format, Erklärung, Tipp-Funktion]
+const METRICS=[
+ ['asym','Symmetrie (Abweichung)',1.5,{m:[0,1.8,3.5],f:[0,1.8,3.5]},v=>v.toFixed(1)+' %','Durchschnittliche Abweichung von 10 Punktpaaren zur Mittellinie, relativ zur Gesichtsbreite. Unter 2 % ist sehr symmetrisch; ab 4–5 % sieht man es deutlich.'],
+ ['fwhr','FWHR (Breite : Mittelgesicht)',1.2,{m:[1.85,2.05,.15],f:[1.75,1.95,.15]},v=>v.toFixed(2),'Wangenknochenbreite geteilt durch Höhe von Brauen bis Oberlippe. Ein höherer FWHR wirkt kompakter und maskuliner.'],
+ ['tilt','Canthal Tilt',1.2,{m:[3,8,4],f:[5,10,4]},v=>(v>0?'+':'')+v.toFixed(1)+'°','Winkel vom inneren zum äußeren Augenwinkel. Positiv (außen höher) wirkt wach und attraktiv; negativ wirkt müde/traurig.'],
+ ['midface','Midface-Ratio',1.0,{m:[.97,1.05,.07],f:[.97,1.07,.07]},v=>v.toFixed(2),'Pupillenabstand geteilt durch Abstand Pupillenlinie → Oberlippe. ~1,0 = kompaktes Mittelgesicht; deutlich darunter = langes Mittelgesicht.'],
+ ['esr','Augenabstand (ESR)',1.0,{m:[.44,.48,.025],f:[.44,.48,.025]},v=>v.toFixed(3),'Pupillenabstand relativ zur Gesichtsbreite. Zu eng oder zu weit stört die Harmonie.'],
+ ['jaw','Kiefer : Wangenbreite',1.0,{m:[.86,.94,.05],f:[.78,.86,.05]},v=>v.toFixed(2),'Breite an den Kieferwinkeln geteilt durch Wangenknochenbreite. Bei Männern wirkt ein breiter Kiefer kantig, bei Frauen ein schmalerer weich (V-Form).'],
+ ['findex','Gesichtsindex (Länge : Breite)',.8,{m:[.86,.94,.06],f:[.82,.9,.06]},v=>v.toFixed(2),'Nasenwurzel bis Kinn geteilt durch Wangenbreite. Zu hoch = langes Gesicht, zu niedrig = rundes/breites Gesicht.'],
+ ['lowMid','Drittel: Unter- vs. Mittelgesicht',1.0,{m:[.95,1.1,.12],f:[.92,1.05,.12]},v=>v.toFixed(2),'Untergesicht (Nase–Kinn) geteilt durch Mittelgesicht (Brauen–Nase). Ideal sind ungefähr gleich große Drittel.'],
+ ['upMid','Drittel: Stirn vs. Mittelgesicht',.6,{m:[.9,1.1,.15],f:[.9,1.1,.15]},v=>v.toFixed(2),'Stirnhöhe (Haaransatz–Brauen) geteilt durch Mittelgesicht. Wird nur gewertet, wenn der Haaransatz korrekt gesetzt ist.'],
+ ['lower','Unteres Drittel (Mund : Kinn)',.8,{m:[1.9,2.2,.25],f:[1.85,2.15,.25]},v=>'1 : '+v.toFixed(2),'Mundspalte–Kinn im Verhältnis zu Nase–Mundspalte. Klassisch ideal ist 1 : 2.'],
+ ['chin','Kinn : Philtrum',.6,{m:[2.0,2.5,.35],f:[1.8,2.2,.35]},v=>v.toFixed(2),'Kinnhöhe (Unterlippe–Kinn) geteilt durch Philtrumlänge. Kurzes Philtrum und ausgeprägtes Kinn gelten als attraktiv.'],
+ ['noseIcd','Nasenbreite : Augeninnenabstand',.7,{m:[.95,1.1,.12],f:[.85,1.0,.12]},v=>v.toFixed(2),'Breite der Nasenflügel geteilt durch den Abstand der inneren Augenwinkel. Ideal etwa gleich breit.'],
+ ['mouthNose','Mund : Nasenbreite',.6,{m:[1.5,1.7,.15],f:[1.5,1.7,.15]},v=>v.toFixed(2),'Mundbreite geteilt durch Nasenbreite, nahe am goldenen Schnitt (1,618).'],
+ ['fifths','Fünftel-Regel (Augen)',.6,{m:[.95,1.1,.15],f:[.95,1.1,.15]},v=>v.toFixed(2),'Augeninnenabstand geteilt durch Augenbreite. Ideal: Zwischen die Augen passt genau ein Auge.'],
+ ['eyeAsp','Augenform (Höhe : Breite)',.6,{m:[.24,.32,.05],f:[.30,.38,.05]},v=>v.toFixed(2),'Lidöffnung im Verhältnis zur Augenbreite. Bei Männern wirken schmalere, mandelförmige Augen („Hunter Eyes"), bei Frauen größere, offenere.'],
+ ['lips','Lippen (Unter- : Oberlippe)',.4,{m:[1.3,1.8,.35],f:[1.2,1.6,.35]},v=>v.toFixed(2),'Höhe der Unterlippe geteilt durch die Oberlippe. Leicht vollere Unterlippe gilt als ideal.'],
+];
+const MNAME=Object.fromEntries(METRICS.map(m=>[m[0],m[1]]));
+
+const TIPS={
+ asym:{c:'p',t:'Viel Asymmetrie auf Fotos kommt von Kopfhaltung, Linse oder Licht. Kopf gerade, Kamera auf Augenhöhe, ≥ 1 m Abstand. Im Alltag helfen: abwechselnd auf beiden Seiten kauen und schlafen und ein Bart- bzw. Haarschnitt, der schwächere Seiten ausgleicht. Leichte Asymmetrie ist völlig normal.'},
+ fwhr:{c:'p',t:'Weniger Körperfett macht die Wangenknochen sichtbarer und erhöht den FWHR optisch. Bei Männern betont Bart an den Seiten die Breite. Seitlich kurze Haare lassen das Gesicht schmaler wirken, darauf achten.'},
+ tilt:{c:'n',t:'Der Canthal Tilt ist Knochenstruktur. Optisch hilft: Augenbrauen außen leicht anheben/zupfen (Brow-Lift-Look), genug Schlaf gegen hängende Lider. Make-up: Lidstrich/Schatten nach außen-oben. Bitte keine „Fox-Eye"-Fäden auf gut Glück, die Risiken sind real.'},
+ midface:{c:'n',t:'Mittelgesichtslänge ist Knochen. Optisch verkürzen: Bart oder Schnurrbart, Brille mit kräftigem Steg, Frisur mit Volumen oben eher vermeiden, wenn das Gesicht lang wirkt.'},
+ esr:{c:'n',t:'Nicht änderbar, aber kaschierbar. Bei weitem Abstand Brauen innen etwas voller lassen, bei engem Abstand innen zupfen und Lidschatten nach außen ziehen. Brillenstege beeinflussen die Wirkung stark.'},
+ jaw:{c:'p',t:'Am stärksten wirkt weniger Körperfett: Ab ~12–15 % (Männer) wird die Kieferlinie sichtbar. Dazu Haltung: Kopf nicht nach vorne schieben, Zunge locker am Gaumen. Ein kurzer, gepflegter Bart kann eine Kieferlinie „zeichnen". Kaugummi-Training hat kaum Wirkung, „Bonesmashing" ist gefährlich und funktioniert nicht.'},
+ findex:{c:'p',t:'Langes Gesicht: Frisur mit Volumen an den Seiten statt oben, Bart kurz an Kinn halten. Rundes Gesicht: Volumen oben, Seiten kurz, Kinnbart; Körperfett reduzieren hilft am meisten.'},
+ lowMid:{c:'p',t:'Ein Bart kann das Untergesicht optisch verlängern oder verkürzen (Kinnpartie länger oder kürzer trimmen). Strukturell ist das Knochenarbeit, für die meisten unnötig.'},
+ upMid:{c:'y',t:'Stirnverhältnis lässt sich am leichtesten ändern, nämlich über die Frisur: Bei hoher Stirn Pony oder Fringe/Textured Crop, bei niedriger Stirn Haare nach hinten oder nach oben stylen.'},
+ lower:{c:'p',t:'Bart-Styling ist das stärkste Werkzeug: Kinnbart verlängert das Kinn, Oberlippenbart „verkürzt" ein langes Philtrum optisch.'},
+ chin:{c:'p',t:'Schwaches Kinn: Kinnbart oder Stubble. Haltung (Kopf nicht vorschieben) und weniger Fett unterm Kinn machen viel aus. Auf Fotos Kopf leicht nach vorne-unten (Kinn „raus und runter").'},
+ noseIcd:{c:'n',t:'Fotografier nicht aus der Nähe: Handys aus <50 cm lassen die Nase bis zu 30 % größer wirken. Hauptkamera aus 1–1,5 m mit 2× Zoom zeigt realistische Proportionen.'},
+ mouthNose:{c:'n',t:'Kleine Wirkung im Gesamtbild. Lippenpflege und ein natürliches, leichtes Lächeln auf Fotos helfen mehr als jede Maßzahl.'},
+ fifths:{c:'n',t:'Augenbrauen-Form und Brille können das Verhältnis optisch verschieben, siehe Tipp zum Augenabstand.'},
+ eyeAsp:{c:'p',t:'Augenringe und Schwellungen reduzieren: 7–9 h Schlaf, weniger Salz und Alkohol, Sonnenschutz. „Squinchen" (Unterlid leicht anheben) lässt Augen auf Fotos fokussierter wirken.'},
+ lips:{c:'y',t:'Lippenpflege (Balsam, Peeling), genug trinken. Kleine Wirkung im Gesamtbild.'},
+};
+const SOFT_TIPS={
+ skin:'Haut: täglich mildes Reinigen, Feuchtigkeitscreme, Sonnenschutz LSF 30+; bei Unreinheiten Salicylsäure oder Niacinamid, bei hartnäckiger Akne zum Hautarzt (Tretinoin & Co. wirken wirklich).',
+ hair:'Haare: Lass dir von einem guten Friseur einen Schnitt für deine Gesichtsform empfehlen, das hat die größte Wirkung pro Euro. Bei Haarausfall früh zum Hautarzt, es gibt wirksame Mittel.',
+ leanness:'Gesichtsfett: Kalorienbilanz, Protein, Krafttraining, Schlaf. Gesichtsfett lässt sich nicht gezielt verlieren, es geht mit dem Körperfett. Wichtig: gesund und langsam, kein Crash-Diäten.',
+ teeth:'Zähne: Professionelle Zahnreinigung, ggf. Aligner/Bleaching beim Zahnarzt. Ein echtes Lächeln wirkt auf Menschen stärker als jede Proportion.',
+ brows:'Augenbrauen: Nur Streuhaare und die Mitte zupfen (lassen), Form nicht zu dünn machen. Gepflegte, volle Brauen stärken den Augenbereich sichtbar.',
+};
+
+// ---------- PSL-Mapping ----------
+function toPSL(h){const T=[[0,1],[4,2],[5.5,3],[7,4],[8.2,5],[9.1,6],[9.6,7],[10,8]];for(let i=1;i<T.length;i++){if(h<=T[i][0]){const[a,b]=T[i-1],[c,d]=T[i];return b+(h-a)/(c-a)*(d-b)}}return 8}
+function tierName(p){return p<2.5?['Deutlich unter Schnitt','Viel Potenzial bei Soft-Faktoren']:p<3.5?['Unter Schnitt','Leicht unter dem Durchschnitt']:p<4.5?['Durchschnitt','Im Mittelfeld der Bevölkerung']:p<5.5?['Über Schnitt','Besser als die meisten']:p<6.5?['Attraktiv','Deutlich überdurchschnittlich']:p<7.5?['Sehr attraktiv','Top wenige Prozent']:['Model-Niveau','Extrem selten']}
+const col=s=>s>=8?'var(--good)':s>=5?'var(--mid)':'var(--bad)';
+
+// ---------- Bewertung ----------
+function evaluate(scroll){
+  const need=POINTS.filter(p=>p[0]!=='hairline').every(p=>pts[p[0]]);
+  if(!need){status('Es fehlen noch Punkte.','warn');return}
+  const M=measure(pts);
+  let ws=0,wt=0;const rows=[];
+  METRICS.forEach(([k,name,w,ideal,fmt,ex])=>{
+    const v=M[k];if(v==null||!isFinite(v)){rows.push({k,name,skip:true,ex});return}
+    const [lo,hi,tol]=ideal[sex];const s=score(v,lo,hi,tol);
+    ws+=s*w;wt+=w;rows.push({k,name,v,s,w,fmt,ex,lo,hi});
+  });
+  const harm=ws/wt;
+  // Soft
+  let final=harm;
+  if($('softOn').checked){const sv=SOFT.map(([k])=>+$('s_'+k).value);const soft=(sv.reduce((a,b)=>a+b,0)/sv.length-1)/4*10;final=harm*.75+soft*.25}
+  const psl=toPSL(final);
+  // Qualität
+  const warns=[];let q=100;
+  if(Math.abs(M.roll)>3){warns.push(`Kopf um ${Math.abs(M.roll).toFixed(1)}° geneigt – wurde rechnerisch ausgeglichen.`);q-=5}
+  const yawDev=Math.abs(Math.log(M.yaw));
+  if(yawDev>.12){warns.push('Kopf wirkt seitlich gedreht. Symmetrie, Augenabstand und Breitenwerte sind dadurch verfälscht. Nimm ein frontaleres Foto.');q-=Math.min(40,yawDev*120)}
+  if(autoHair){warns.push('Haaransatz nicht bestätigt: Das Stirn-Drittel wird nicht gewertet. Zieh den gelben Punkt auf deinen Haaransatz.');q-=5}
+  if(M.tiltDiff>4){warns.push('Die Augenwinkel links und rechts unterscheiden sich stark. Prüfe die Punkte der Augenwinkel.');q-=8}
+  if(M.eyeAsp<.15||M.eyeAsp>.5){warns.push('Augen wirken zugekniffen oder aufgerissen. Neutral schauen.');q-=10}
+  if(M.lips<.6||M.lips>3){warns.push('Lippenpunkte wirken unplausibel. Mund geschlossen und entspannt?');q-=8}
+  q=Math.max(20,Math.round(q));
+  lastResult={date:new Date().toISOString(),psl:+psl.toFixed(2),harm:+harm.toFixed(2),final:+final.toFixed(2),sym:M.asym,qual:q,sex,
+    metrics:Object.fromEntries(rows.filter(r=>!r.skip).map(r=>[r.k,+r.v.toFixed(3)]))};
+  // Render
+  $('placeholder').style.display='none';$('resultsCard').style.display='block';
+  $('pslVal').textContent=psl.toFixed(1);
+  $('ringArc').style.strokeDashoffset=377*(1-(psl-1)/7);
+  const [tn,ts]=tierName(psl);$('tier').textContent=tn;
+  $('tierSub').textContent=`${ts} · Hauptwert ${final.toFixed(1)}/10${$('softOn').checked?' (inkl. Soft-Faktoren)':''}`;
+  $('kHarm').textContent=harm.toFixed(1)+'/10';$('kSym').textContent=M.asym.toFixed(1)+' %';
+  $('kQual').textContent=q+' %';$('kQual').style.color=q>=80?'var(--good)':q>=60?'var(--mid)':'var(--bad)';
+  $('warns').innerHTML=warns.map(w=>`<div>⚠ ${w}</div>`).join('');
+  $('metrics').innerHTML=rows.map(r=>r.skip?`<div class="m"><span class="n">${r.name}</span><span class="val sub">nicht gewertet</span><div class="ex" style="display:block">Haaransatz setzen, um das zu messen.</div></div>`:
+    `<div class="m"><span class="n">${r.name}</span><span class="val">${r.fmt(r.v)}</span><span class="ideal">Ideal: ${r.fmt(r.lo)} – ${r.fmt(r.hi)}${r.v<r.lo?' · zu niedrig':r.v>r.hi?' · zu hoch':' · ✓'}</span><span class="sc" style="color:${col(r.s)}">${r.s.toFixed(1)}</span><div class="bar"><i style="width:${r.s*10}%;background:${col(r.s)}"></i></div><div class="ex">${r.ex}</div></div>`).join('');
+  $('metrics').querySelectorAll('.m').forEach(el=>el.onclick=()=>el.classList.toggle('open'));
+  // Tipps: nach verlorenem Gewicht sortiert
+  const lost=rows.filter(r=>!r.skip&&r.s<8.5).map(r=>({...r,loss:(10-r.s)*r.w})).sort((a,b)=>b.loss-a.loss);
+  const tag={y:'<span class="tag y">gut änderbar</span>',p:'<span class="tag p">teils änderbar</span>',n:'<span class="tag n">Knochen · nur optisch</span>'};
+  let html='';
+  if(Math.abs(Math.log(M.yaw))>.12||M.asym>4)html+=`<div class="tip"><h4>📸 Zuerst: besseres Messfoto</h4><p>Hauptkamera, 1–1,5 m Abstand, 2× Zoom, Kamera auf Augenhöhe, gleichmäßiges Tageslicht von vorne, neutraler Ausdruck. Das allein kann den Wert um über 0,5 PSL verschieben, weil es Messfehler entfernt.</p></div>`;
+  lost.slice(0,6).forEach(r=>{const t=TIPS[r.k];html+=`<div class="tip"><h4>${r.name} <span class="sub" style="font-weight:500">${r.fmt(r.v)}</span> ${tag[t.c]}</h4><p>${t.t}</p></div>`});
+  const sv=SOFT.map(([k])=>[k,+$('s_'+k).value]).sort((a,b)=>a[1]-b[1]);
+  sv.filter(s=>s[1]<=3).slice(0,3).forEach(([k])=>html+=`<div class="tip"><h4>${SOFT.find(s=>s[0]===k)[1]} ${tag.y}</h4><p>${SOFT_TIPS[k]}</p></div>`);
+  if(!lost.length)html+=`<div class="tip"><h4>Stark 💪</h4><p>Alle gemessenen Proportionen liegen nahe am Ideal. Den größten Unterschied machen jetzt Haut, Haare, Körperfett und Ausstrahlung.</p></div>`;
+  html+=`<p class="note">Nicht empfohlen, weil wirkungslos oder riskant: Bonesmashing, extremes Mewing bei Erwachsenen, Crash-Diäten, unregulierte Peptide/Hormone. Echte Veränderung kommt von Körperfett, Haut, Haaren, Schlaf, Haltung und Stil.</p>`;
+  $('tips').innerHTML=html;
+  if(scroll===true&&window.innerWidth<900)$('resultsCard').scrollIntoView({behavior:'smooth'});
+}
+
+// ---------- Verlauf ----------
+$('saveBtn').onclick=()=>{if(!lastResult)return;history.push(lastResult);try{localStorage.setItem('psl_hist',JSON.stringify(history))}catch(e){}
+  $('saveBtn').textContent='✓ Gespeichert';setTimeout(()=>$('saveBtn').textContent='💾 Im Verlauf speichern',1500)};
+function renderHistory(){
+  if(!history.length){$('chart').innerHTML='';$('histTable').innerHTML='<div class="empty">Noch keine Messungen gespeichert.</div>';return}
+  const W=640,H=180,p=30,xs=i=>p+(history.length===1?(W-2*p)/2:i*(W-2*p)/(history.length-1)),ys=v=>H-p-(v-1)/7*(H-2*p);
+  let grid='';for(let v=1;v<=8;v++)grid+=`<line x1="${p}" x2="${W-p}" y1="${ys(v)}" y2="${ys(v)}" stroke="#262b38"/><text x="4" y="${ys(v)+4}" fill="#8a91a3" font-size="11">${v}</text>`;
+  const path=history.map((h,i)=>`${i?'L':'M'}${xs(i)},${ys(h.psl)}`).join('');
+  $('chart').innerHTML=`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto">${grid}<path d="${path}" fill="none" stroke="#7c9cff" stroke-width="2.5"/>${history.map((h,i)=>`<circle cx="${xs(i)}" cy="${ys(h.psl)}" r="4.5" fill="#a78bfa"><title>${h.psl}</title></circle>`).join('')}</svg>`;
+  $('histTable').innerHTML=`<table><tr><th>Datum</th><th>PSL</th><th>Harmonie</th><th>Symmetrie</th><th>Qualität</th><th></th></tr>${history.map((h,i)=>`<tr><td>${new Date(h.date).toLocaleString('de-DE',{dateStyle:'short',timeStyle:'short'})}</td><td><b>${h.psl.toFixed(1)}</b></td><td>${h.harm.toFixed(1)}</td><td>${h.sym.toFixed(1)} %</td><td>${h.qual} %</td><td><button class="btn" style="padding:4px 9px" data-del="${i}">✕</button></td></tr>`).reverse().join('')}</table>`;
+  $('histTable').querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{history.splice(+b.dataset.del,1);try{localStorage.setItem('psl_hist',JSON.stringify(history))}catch(e){}renderHistory()});
+}
+</script>
+</body>
+</html>
